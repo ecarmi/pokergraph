@@ -12,18 +12,21 @@ def get_file_stacks(file_path):
     Returns:
         list: Every index of stacks from the poker CSV.
     """
-    stacks = []
+    stacks_lines = []
+    buy_in_lines = []
 
     # Reading file
     with open(file_path, "r") as file:
         lines = csv.reader(file, delimiter=",")
         for line in lines:
             if "Player stacks" in line[0]:
-                stacks.append(line[0])
+                stacks_lines.append(line[0])
+            elif "joined the game with a stack" in line[0]:
+                buy_in_lines.append(line[0])
 
-    return stacks[::-1]
+    return stacks_lines[::-1], buy_in_lines
 
-def init_poker_table(rev_stacks):
+def init_poker_table(rev_stacks, buy_lines):
     """
     Initializes the poker table for further manipulation.
 
@@ -52,11 +55,21 @@ def init_poker_table(rev_stacks):
                     real_players[id].append(name) # Adds the new alias to player
 
             amount = int(player_bio[player_bio.find("(") + 1 : player_bio.rfind(")")]) # Finds amount of chips per round per person
-            dict = {id: int(amount)} # Updates temporary dict
-            round.append(dict)
-        
+            round.append({id: int(amount)})
+
         round_list.append(round)
+
+    buy_in_amounts_id = {}
+    buy_in_amounts_name = {}
     
+    for line in buy_lines:
+        
+        id = line[line.find('@') + 1 : line.find('"', line.find('@') + 1)].strip() # Finds each id
+        buy_in_amounts_id[id] = 1 if not id in buy_in_amounts_id else buy_in_amounts_id[id] + 1
+        buy_in_amounts_name[" / ".join(real_players[id])] = 1 if not " / ".join(real_players[id]) in buy_in_amounts_name else buy_in_amounts_name[" / ".join(real_players[id])] + 1
+
+    print(buy_in_amounts_id,buy_in_amounts_name)
+        
     return real_players, round_list
 
 def create_plot_fig(player_list, rounds, night_num):
@@ -107,14 +120,14 @@ def main():
 
     while True:
         try:
-            el_stackos = get_file_stacks(file_name)
+            stackos, buy_inos = get_file_stacks(file_name)
             break
         except Exception as e:
             print(e)
             file_name = input("Ledger CSV file path: ")
 
     night = input("Ledger night #: ")
-    ps, rds = init_poker_table(el_stackos)
+    ps, rds = init_poker_table(stackos, buy_inos)
     create_plot_fig(ps, rds, night)
 
     print("Figure presented successfully.")
