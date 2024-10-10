@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import csv
+import re
 
 def get_file_stacks(file_path):
     """
@@ -13,20 +14,17 @@ def get_file_stacks(file_path):
         list: Every index of stacks from the poker CSV.
     """
     stacks_lines = []
-    buy_in_lines = []
 
     # Reading file
     with open(file_path, "r") as file:
         lines = csv.reader(file, delimiter=",")
         for line in lines:
-            if "Player stacks" in line[0]:
+            if "Player stacks" in line[0] or "joined the game with a stack" in line[0] or "sit back with the" in line[0]:
                 stacks_lines.append(line[0])
-            elif "joined the game with a stack" in line[0]:
-                buy_in_lines.append(line[0])
 
-    return stacks_lines[::-1], buy_in_lines
+    return stacks_lines[::-1]
 
-def init_poker_table(rev_stacks, buy_lines):
+def init_poker_table(rev_stacks):
     """
     Initializes the poker table for further manipulation.
 
@@ -39,8 +37,26 @@ def init_poker_table(rev_stacks, buy_lines):
     """
     real_players = {} # Dict that stores values in id:[aliases] format
     round_list = []
+    buy_in_value = {}
+    quit_val = {}
 
     for line in rev_stacks:
+        match = re.search(r"The player \".*@\s(.*)\" (joined|sit back) (?:the game with a|with the) stack of (\d+)", line)
+
+        if match:
+            id = match.group(1)
+            buy_in_amount = int(match.group(3))
+            
+            if match.group(2) == "sit back":
+                quit_val[id] = buy_in_amount
+                continue
+
+            if id in quit_val and quit_val[id] == buy_in_amount:
+                continue
+
+            buy_in_value[id] = buy_in_amount if not id in buy_in_value else buy_in_value[id] + buy_in_amount
+            continue
+
         sep = line.split("|") # Separates each line in each stack
         round = []
 
@@ -55,20 +71,9 @@ def init_poker_table(rev_stacks, buy_lines):
                     real_players[id].append(name) # Adds the new alias to player
 
             amount = int(player_bio[player_bio.find("(") + 1 : player_bio.rfind(")")]) # Finds amount of chips per round per person
-            round.append({id: int(amount)})
+            round.append({id: [amount, (amount - (0 if id not in buy_in_value else buy_in_value[id])) / 100]})
 
         round_list.append(round)
-
-    buy_in_amounts_id = {}
-    buy_in_amounts_name = {}
-    
-    for line in buy_lines:
-        
-        id = line[line.find('@') + 1 : line.find('"', line.find('@') + 1)].strip() # Finds each id
-        buy_in_amounts_id[id] = 1 if not id in buy_in_amounts_id else buy_in_amounts_id[id] + 1
-        buy_in_amounts_name[" / ".join(real_players[id])] = 1 if not " / ".join(real_players[id]) in buy_in_amounts_name else buy_in_amounts_name[" / ".join(real_players[id])] + 1
-
-    print(buy_in_amounts_id,buy_in_amounts_name)
         
     return real_players, round_list
 
@@ -84,29 +89,53 @@ def create_plot_fig(player_list, rounds, night_num):
     Returns:
         Nothing, void function.
     """
-    plt.figure(figsize=(12, 6))
+    fig, (p1, p2, p3) = plt.subplots(3, 1, figsize=(12, 8))
+
     colors = plt.cm.tab10(np.linspace(0, 1, len(player_list))) # Initializing a pre-set list of colors
     x = np.arange(1, len(rounds) + 1) # Creating the x-values array
 
+    table = []
+
     for index, (player, aliases) in enumerate(player_list.items()): # Ranging through each player's games
         player_values = []
+        cash_values = []
 
         for round_itr in rounds: # Going through every round
             player_amount = np.nan # Initializing a NaN value for each player
+            cash_amount = np.nan
 
             for dict_values in round_itr:
                 if player in dict_values:
-                    player_amount = dict_values[player] # If the player has a value in chips, the amount is added
+                    player_amount = dict_values[player][0] # If the player has a value in chips, the amount is added
+                    cash_amount = dict_values[player][1]
                     break
             
             player_values.append(player_amount)
+            cash_values.append(cash_amount)
 
-        plt.plot(x, player_values, label=" / ".join(aliases), color=colors[index])
+        p1.plot(x, player_values, label=" / ".join(aliases), color=colors[index])
+        p2.plot(x, cash_values, label=" / ".join(aliases), color=colors[index])
 
-    plt.legend(fontsize='small',loc="upper left")
-    plt.title('Fuck GOA Poker Night ' + night_num)
-    plt.xlabel('Round #')
-    plt.ylabel('Chips')
+        cash_values_np = np.array(cash_values)
+        table.append([" / ".join(aliases), f"${cash_values_np[~np.isnan(cash_values_np)][-1] if np.any(~np.isnan(cash_values_np)) else None}"])
+    
+    p1.set_title('Fuck GOA Poker Night ' + night_num)
+    p1.set_xlabel('Round #')
+    p1.set_ylabel('Chips')
+
+    p2.set_xlabel('Round #')
+    p2.set_ylabel('Money')
+
+    p2.legend(fontsize='small', loc="upper left")
+
+    table.insert(0, ["Name", "Results"])
+
+    p3.axis('tight')
+    p3.axis('off')
+    vis_table = p3.table(cellText=table, colLabels=None, cellLoc = 'center', loc='center')
+    vis_table.auto_set_font_size(False)
+    vis_table.set_fontsize(10)
+
     plt.show()
 
 def main():
@@ -120,14 +149,14 @@ def main():
 
     while True:
         try:
-            stackos, buy_inos = get_file_stacks(file_name)
+            stackos = get_file_stacks(file_name)
             break
         except Exception as e:
             print(e)
             file_name = input("Ledger CSV file path: ")
 
     night = input("Ledger night #: ")
-    ps, rds = init_poker_table(stackos, buy_inos)
+    ps, rds = init_poker_table(stackos)
     create_plot_fig(ps, rds, night)
 
     print("Figure presented successfully.")
