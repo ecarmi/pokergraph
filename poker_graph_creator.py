@@ -146,7 +146,7 @@ def create_plot_fig(player_list, rounds, night_num):
     p1.set_ylabel('Chips')
 
     p2.set_xlabel('Round #')
-    p2.set_ylabel('Money')
+    p2.set_ylabel('Money (USD)')
 
     p2.legend(fontsize='small', loc="upper left")
 
@@ -157,6 +157,7 @@ def create_plot_fig(player_list, rounds, night_num):
     vis_table = p3.table(cellText=table, colLabels=None, cellLoc = 'center', loc='center')
     vis_table.auto_set_font_size(False)
     vis_table.set_fontsize(10)
+    plt.subplots_adjust(left=.065, bottom=0, right=.99, top=.95, wspace=None, hspace=0)
 
     plt.show()
 
