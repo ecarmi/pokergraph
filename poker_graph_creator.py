@@ -2,8 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import csv
 import re
+import os
 
-set_buy_in_amount = 500
+set_buy_in_amount = [500,1000,731]
 
 def get_file_stacks(file_path):
     """
@@ -61,17 +62,14 @@ def init_poker_table(rev_stacks):
         if match:  # if line is joined/sit back
             id = match.group(1)
             buy_in_amount = int(match.group(3))
-            if id == "sDvCEJwYSa":
-                    print(line+str(buy_in_amount))
             
             if match.group(2) == "sit back":
                 #quit_val[id] = buy_in_amount
                 None
                             
-            elif buy_in_amount == set_buy_in_amount:
+            elif buy_in_amount in set_buy_in_amount:
                 buy_in_value[id] = buy_in_amount if (not id in buy_in_value) else buy_in_value[id] + buy_in_amount
                 if id == "sDvCEJwYSa":
-                    #print(buy_in_amount)
                     None
                 continue
             continue
@@ -159,29 +157,56 @@ def create_plot_fig(player_list, rounds, night_num):
     vis_table.set_fontsize(10)
     plt.subplots_adjust(left=.065, bottom=0, right=.99, top=.95, wspace=None, hspace=0)
 
-    plt.show()
+    return plt
 
 def main():
     """
     Main function for this program, ran at the start.
     """
     print("Welcome to the Poker Graph Creator.")
-
-    file_name = input("Ledger CSV file path: ")
     el_stackos = []
+    save_all = input("Do you want to save all files? ")
+    if "yes" in save_all:
+        foldername = input("Enter name of folder to save to: ")
+        key = 0
+        for file in os.listdir("logs"):
+            f = os.path.join("logs", file)
+            if os.path.isfile(f):
+                if f.endswith(".csv"):
+                    print(f)
+                    night = f
+                    stackos = get_file_stacks(f)
+                    ps, rds = init_poker_table(stackos)
+                    plot = create_plot_fig(ps, rds, night)
+                    '''try:
+                        os.mkdir(foldername)
+                    except FileExistsError:
+                        continue
+                    os.chdir(foldername)'''
+                    plot.savefig(f.replace(".csv",""))
+                    #os.chdir("logs")
+                    key +=1
+    elif "no" in save_all:
 
-    while True:
-        try:
-            stackos = get_file_stacks(file_name)
-            break
-        except Exception as e:
-            print(e)
-            file_name = input("Ledger CSV file path: ")
+        file_name = input("Ledger CSV file path: ")
+        
 
-    night = input("Ledger night #: ")
-    ps, rds = init_poker_table(stackos)
-    create_plot_fig(ps, rds, night)
+        while True:
+            try:
+                stackos = get_file_stacks(file_name)
+                break
+            except Exception as e:
+                print(e)
+                file_name = input("Ledger CSV file path: ")
 
-    print("Figure presented successfully.")
+        night = input("Ledger night #: ")
+        ps, rds = init_poker_table(stackos)
+        plot = create_plot_fig(ps, rds, night)
+        plot.show()
+
+        print("Figure presented successfully.")
+   
+
+    
 
 main()
