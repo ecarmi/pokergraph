@@ -4,7 +4,7 @@ import csv
 import re
 import os
 
-set_buy_in_amount = [500,1000,731]
+set_buy_in_amount = [500,731]
 
 def get_file_stacks(file_path):
     """
@@ -45,6 +45,7 @@ def init_poker_table(rev_stacks):
     quit_val = {}
     global final_vals # last chip value player has
     final_vals = {}
+    quit_bool = {}
     
 
     for line in rev_stacks:
@@ -55,6 +56,8 @@ def init_poker_table(rev_stacks):
             id = match1.group(1)
             final_value = int(match1.group(3))
             final_vals [id] = final_value
+            #quit_bool [id] = True
+
             continue
 
         match = re.search(r"The player \".*@\s(.*)\" (joined|sit back) (?:the game with a|with the) stack of (\d+)", line)
@@ -64,13 +67,17 @@ def init_poker_table(rev_stacks):
             buy_in_amount = int(match.group(3))
             
             if match.group(2) == "sit back":
+                '''id in quit_bool and quit_bool[id] and'''
+                if  buy_in_amount == final_vals[id]:
+                    quit_bool[id] = True
+
                 #quit_val[id] = buy_in_amount
-                None
+
                             
-            elif buy_in_amount in set_buy_in_amount:
-                buy_in_value[id] = buy_in_amount if (not id in buy_in_value) else buy_in_value[id] + buy_in_amount
-                if id == "sDvCEJwYSa":
-                    None
+            elif buy_in_amount in set_buy_in_amount: #when buy back
+                if not( id in quit_bool and not quit_bool[id] and not buy_in_amount ==final_vals[id]):
+                    buy_in_value[id] = buy_in_amount if (not id in buy_in_value) else buy_in_value[id] + buy_in_amount
+                    quit_bool[id] = False                    
                 continue
             continue
         
@@ -91,7 +98,7 @@ def init_poker_table(rev_stacks):
             round.append({id: [amount, (amount - (0 if id not in buy_in_value else buy_in_value[id])) / 100]})
 
         round_list.append(round)
-       
+    
     return real_players, round_list
 
 def create_plot_fig(player_list, rounds, night_num):
@@ -136,6 +143,7 @@ def create_plot_fig(player_list, rounds, night_num):
     #loop thorugh final append to cash 
     table = []
     for player in final_vals:
+        print(buy_in_value)
         final_vals[player] = (final_vals[player] - buy_in_value[player]) /100
         table.append([player_list[player][0], final_vals[player]])        
     
@@ -178,19 +186,19 @@ def main():
                     stackos = get_file_stacks(f)
                     ps, rds = init_poker_table(stackos)
                     plot = create_plot_fig(ps, rds, night)
-                    '''try:
+                    try:
                         os.mkdir(foldername)
                     except FileExistsError:
                         continue
-                    os.chdir(foldername)'''
+                    os.chdir(foldername)
                     plot.savefig(f.replace(".csv",""))
-                    #os.chdir("logs")
+                    os.chdir("../graphs")
+                    os.chdir("logs")
                     key +=1
     elif "no" in save_all:
 
         file_name = input("Ledger CSV file path: ")
         
-
         while True:
             try:
                 stackos = get_file_stacks(file_name)
@@ -205,8 +213,4 @@ def main():
         plot.show()
 
         print("Figure presented successfully.")
-   
-
-    
-
 main()
